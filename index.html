@@ -1,0 +1,1398 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SecurePolicy — Generador de Políticas de Seguridad</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=Epilogue:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+<style>
+:root {
+  --bg: #f7f5f0;
+  --ink: #111118;
+  --surface: #ffffff;
+  --border: #e2ddd6;
+  --muted: #8a8580;
+  --accent: #1a56db;
+  --accent-light: #eef3fd;
+  --accent2: #0d9f6e;
+  --accent2-light: #ecfdf5;
+  --warn: #d97706;
+  --warn-light: #fffbeb;
+  --danger: #dc2626;
+  --radius: 10px;
+  --shadow: 0 2px 12px rgba(0,0,0,0.07);
+  --shadow-lg: 0 8px 32px rgba(0,0,0,0.1);
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  font-family: 'Epilogue', sans-serif;
+  background: var(--bg);
+  color: var(--ink);
+  min-height: 100vh;
+  font-size: 15px;
+}
+
+/* Grain overlay */
+body::after {
+  content: '';
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 9999;
+  opacity: 0.025;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 512 512' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.75' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+}
+
+/* ---- LAYOUT ---- */
+.app { display: grid; grid-template-columns: 360px 1fr; min-height: 100vh; }
+@media(max-width:900px){ .app { grid-template-columns: 1fr; } }
+
+/* ---- SIDEBAR ---- */
+.sidebar {
+  background: var(--ink);
+  color: #f0ece4;
+  padding: 36px 28px 40px;
+  display: flex;
+  flex-direction: column;
+  position: sticky;
+  top: 0;
+  height: 100vh;
+  overflow-y: auto;
+}
+
+@media(max-width:900px){
+  .sidebar { position: static; height: auto; }
+}
+
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 36px;
+}
+
+.brand-icon {
+  width: 38px; height: 38px;
+  background: var(--accent);
+  border-radius: 9px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 18px;
+  flex-shrink: 0;
+}
+
+.brand h1 {
+  font-family: 'DM Serif Display', serif;
+  font-size: 19px;
+  color: #f0ece4;
+  letter-spacing: -0.2px;
+  line-height: 1.2;
+}
+
+.brand p {
+  font-size: 11px;
+  color: rgba(240,236,228,0.45);
+  margin-top: 2px;
+}
+
+/* API Key input */
+.api-section {
+  background: rgba(255,255,255,0.06);
+  border: 1px solid rgba(255,255,255,0.1);
+  border-radius: 8px;
+  padding: 14px 16px;
+  margin-bottom: 28px;
+}
+
+.api-section label {
+  display: block;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: rgba(240,236,228,0.5);
+  margin-bottom: 7px;
+}
+
+.api-input {
+  width: 100%;
+  background: rgba(255,255,255,0.08);
+  border: 1px solid rgba(255,255,255,0.12);
+  border-radius: 6px;
+  padding: 9px 12px;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 12px;
+  color: #f0ece4;
+  outline: none;
+  transition: border-color .15s;
+}
+
+.api-input:focus { border-color: var(--accent); }
+.api-input::placeholder { color: rgba(240,236,228,0.25); }
+
+.api-note {
+  font-size: 10px;
+  color: rgba(240,236,228,0.35);
+  margin-top: 7px;
+  line-height: 1.5;
+}
+
+/* Form sections */
+.form-section { margin-bottom: 24px; }
+
+.section-label {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: rgba(240,236,228,0.45);
+  margin-bottom: 10px;
+  display: block;
+}
+
+/* Select fields */
+.field { margin-bottom: 12px; }
+
+.field label {
+  display: block;
+  font-size: 12px;
+  font-weight: 500;
+  color: rgba(240,236,228,0.7);
+  margin-bottom: 5px;
+}
+
+.field select, .field input[type=text] {
+  width: 100%;
+  background: rgba(255,255,255,0.07);
+  border: 1px solid rgba(255,255,255,0.12);
+  border-radius: 7px;
+  padding: 10px 12px;
+  font-family: 'Epilogue', sans-serif;
+  font-size: 13px;
+  color: #f0ece4;
+  outline: none;
+  transition: border-color .15s;
+  appearance: none;
+  cursor: pointer;
+}
+
+.field select:focus, .field input[type=text]:focus {
+  border-color: rgba(26,86,219,0.7);
+  background: rgba(255,255,255,0.1);
+}
+
+.field select option { background: #1e1e2a; color: #f0ece4; }
+
+/* Checkbox grid */
+.check-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
+}
+
+.check-item {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  background: rgba(255,255,255,0.05);
+  border: 1px solid rgba(255,255,255,0.08);
+  border-radius: 7px;
+  padding: 8px 10px;
+  cursor: pointer;
+  transition: all .15s;
+  font-size: 12px;
+  color: rgba(240,236,228,0.65);
+  user-select: none;
+}
+
+.check-item:hover { background: rgba(255,255,255,0.09); color: #f0ece4; }
+.check-item.checked { background: rgba(26,86,219,0.2); border-color: rgba(26,86,219,0.5); color: #f0ece4; }
+
+.check-item input { display: none; }
+
+.check-box {
+  width: 14px; height: 14px;
+  border: 1.5px solid rgba(255,255,255,0.2);
+  border-radius: 3px;
+  display: flex; align-items: center; justify-content: center;
+  flex-shrink: 0;
+  transition: all .15s;
+  font-size: 9px;
+}
+
+.check-item.checked .check-box { background: var(--accent); border-color: var(--accent); }
+
+/* Generate button */
+.btn-generate {
+  width: 100%;
+  background: var(--accent);
+  color: white;
+  border: none;
+  border-radius: 8px;
+  padding: 14px;
+  font-family: 'DM Serif Display', serif;
+  font-size: 17px;
+  cursor: pointer;
+  transition: all .2s;
+  margin-top: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  letter-spacing: 0.01em;
+}
+
+.btn-generate:hover { background: #1648c4; transform: translateY(-1px); box-shadow: 0 6px 20px rgba(26,86,219,0.3); }
+.btn-generate:disabled { opacity: .45; cursor: not-allowed; transform: none; box-shadow: none; }
+
+.sidebar-footer {
+  margin-top: auto;
+  padding-top: 24px;
+  font-size: 11px;
+  color: rgba(240,236,228,0.25);
+  line-height: 1.6;
+  border-top: 1px solid rgba(255,255,255,0.07);
+}
+
+/* ---- MAIN ---- */
+.main { padding: 40px 44px; overflow-y: auto; }
+@media(max-width:700px){ .main { padding: 28px 20px; } }
+
+/* Welcome state */
+.welcome {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 70vh;
+  text-align: center;
+  padding: 40px;
+}
+
+.welcome-icon { font-size: 56px; margin-bottom: 20px; opacity: 0.7; }
+
+.welcome h2 {
+  font-family: 'DM Serif Display', serif;
+  font-size: 32px;
+  color: var(--ink);
+  margin-bottom: 12px;
+  letter-spacing: -0.5px;
+}
+
+.welcome p { font-size: 15px; color: var(--muted); max-width: 420px; line-height: 1.7; margin-bottom: 32px; }
+
+.feature-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 14px;
+  max-width: 520px;
+  text-align: left;
+}
+
+@media(max-width:500px){ .feature-grid { grid-template-columns: 1fr; } }
+
+.feature-card {
+  background: var(--surface);
+  border: 1.5px solid var(--border);
+  border-radius: 10px;
+  padding: 16px 18px;
+}
+
+.feature-card .fc-icon { font-size: 22px; margin-bottom: 7px; }
+.feature-card .fc-title { font-size: 13px; font-weight: 600; color: var(--ink); margin-bottom: 3px; }
+.feature-card .fc-desc { font-size: 12px; color: var(--muted); line-height: 1.5; }
+
+/* Loading state */
+.loading-state {
+  display: none;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 60vh;
+  gap: 20px;
+}
+
+.spinner {
+  width: 48px; height: 48px;
+  border: 3px solid var(--border);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  animation: spin .8s linear infinite;
+}
+
+@keyframes spin { to { transform: rotate(360deg); } }
+
+.loading-text {
+  text-align: center;
+}
+
+.loading-text h3 {
+  font-family: 'DM Serif Display', serif;
+  font-size: 22px;
+  margin-bottom: 6px;
+  color: var(--ink);
+}
+
+.loading-text p { font-size: 13px; color: var(--muted); }
+
+.loading-steps {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 10px;
+}
+
+.l-step {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  color: var(--muted);
+  opacity: 0.4;
+  transition: opacity .3s;
+}
+
+.l-step.active { opacity: 1; color: var(--accent); }
+.l-step.done { opacity: 0.7; color: var(--accent2); }
+.l-step .dot { width: 6px; height: 6px; border-radius: 50%; background: currentColor; flex-shrink: 0; }
+
+/* Results */
+.results { display: none; }
+
+.results-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  margin-bottom: 28px;
+  flex-wrap: wrap;
+  gap: 16px;
+}
+
+.results-meta h2 {
+  font-family: 'DM Serif Display', serif;
+  font-size: 28px;
+  letter-spacing: -0.4px;
+  margin-bottom: 4px;
+}
+
+.results-meta p { font-size: 13px; color: var(--muted); }
+
+.results-actions { display: flex; gap: 10px; flex-wrap: wrap; }
+
+.btn-action {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 10px 18px;
+  border-radius: 8px;
+  font-family: 'Epilogue', sans-serif;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all .15s;
+  border: none;
+}
+
+.btn-pdf {
+  background: var(--ink);
+  color: white;
+}
+
+.btn-pdf:hover { background: #2a2a3a; transform: translateY(-1px); }
+
+.btn-copy {
+  background: var(--surface);
+  color: var(--ink);
+  border: 1.5px solid var(--border);
+}
+
+.btn-copy:hover { border-color: var(--accent); color: var(--accent); }
+
+/* Company badge */
+.company-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  background: var(--surface);
+  border: 1.5px solid var(--border);
+  border-radius: 100px;
+  padding: 6px 14px 6px 10px;
+  font-size: 12px;
+  color: var(--muted);
+  margin-bottom: 24px;
+}
+
+.company-badge .dot { width: 7px; height: 7px; background: var(--accent2); border-radius: 50%; animation: pulse 2s infinite; }
+@keyframes pulse { 0%,100%{opacity:1}50%{opacity:.3} }
+
+/* Policy tabs */
+.tabs-nav {
+  display: flex;
+  gap: 4px;
+  margin-bottom: 20px;
+  border-bottom: 2px solid var(--border);
+  overflow-x: auto;
+}
+
+.tab-btn {
+  background: none;
+  border: none;
+  padding: 10px 18px;
+  font-family: 'Epilogue', sans-serif;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--muted);
+  cursor: pointer;
+  border-bottom: 2px solid transparent;
+  margin-bottom: -2px;
+  transition: all .15s;
+  white-space: nowrap;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.tab-btn:hover { color: var(--ink); }
+.tab-btn.active { color: var(--accent); border-bottom-color: var(--accent); font-weight: 600; }
+
+/* Policy content */
+.policy-panel { display: none; animation: fadeIn .25s ease; }
+.policy-panel.active { display: block; }
+@keyframes fadeIn { from{opacity:0;transform:translateY(6px)} to{opacity:1;transform:translateY(0)} }
+
+.policy-card {
+  background: var(--surface);
+  border: 1.5px solid var(--border);
+  border-radius: var(--radius);
+  overflow: hidden;
+  box-shadow: var(--shadow);
+}
+
+.policy-card-head {
+  padding: 20px 26px;
+  border-bottom: 1.5px solid var(--border);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.policy-card-head h3 {
+  font-family: 'DM Serif Display', serif;
+  font-size: 20px;
+  color: var(--ink);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.severity-badge {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  padding: 3px 10px;
+  border-radius: 100px;
+}
+
+.sev-alta { background: rgba(220,38,38,0.1); color: var(--danger); }
+.sev-media { background: rgba(217,119,6,0.1); color: var(--warn); }
+.sev-baja { background: rgba(13,159,110,0.1); color: var(--accent2); }
+
+.policy-body {
+  padding: 26px;
+  line-height: 1.8;
+  font-size: 14px;
+  color: #2a2a35;
+  max-height: 600px;
+  overflow-y: auto;
+}
+
+/* Policy content styling */
+.policy-body h4 {
+  font-family: 'DM Serif Display', serif;
+  font-size: 16px;
+  color: var(--ink);
+  margin: 20px 0 8px;
+  padding-bottom: 6px;
+  border-bottom: 1px solid var(--border);
+}
+
+.policy-body h4:first-child { margin-top: 0; }
+
+.policy-body ul {
+  padding-left: 18px;
+  margin: 8px 0 12px;
+}
+
+.policy-body ul li {
+  margin-bottom: 5px;
+  position: relative;
+}
+
+.policy-body ul li::marker { color: var(--accent); }
+
+.policy-body strong { color: var(--ink); font-weight: 600; }
+
+.policy-body .highlight-box {
+  background: var(--accent-light);
+  border-left: 3px solid var(--accent);
+  padding: 12px 16px;
+  border-radius: 0 6px 6px 0;
+  margin: 12px 0;
+  font-size: 13px;
+}
+
+.policy-body .warn-box {
+  background: var(--warn-light);
+  border-left: 3px solid var(--warn);
+  padding: 12px 16px;
+  border-radius: 0 6px 6px 0;
+  margin: 12px 0;
+  font-size: 13px;
+}
+
+.policy-body table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 12px 0;
+  font-size: 13px;
+}
+
+.policy-body th {
+  background: var(--bg);
+  padding: 8px 12px;
+  text-align: left;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--muted);
+  border: 1px solid var(--border);
+}
+
+.policy-body td {
+  padding: 8px 12px;
+  border: 1px solid var(--border);
+  color: var(--ink);
+}
+
+.policy-body tr:nth-child(even) td { background: var(--bg); }
+
+/* Compliance tags */
+.compliance-strip {
+  padding: 14px 26px;
+  border-top: 1px solid var(--border);
+  background: var(--bg);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.compliance-strip span {
+  font-size: 11px;
+  color: var(--muted);
+  font-weight: 500;
+}
+
+.comp-tag {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  padding: 3px 9px;
+  border-radius: 4px;
+  background: rgba(26,86,219,0.08);
+  color: var(--accent);
+  border: 1px solid rgba(26,86,219,0.15);
+}
+
+/* Summary cards */
+.summary-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 12px;
+  margin-bottom: 24px;
+}
+
+.sum-card {
+  background: var(--surface);
+  border: 1.5px solid var(--border);
+  border-radius: 8px;
+  padding: 14px 16px;
+}
+
+.sum-card .sc-label { font-size: 10px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); margin-bottom: 5px; }
+.sum-card .sc-val { font-family: 'DM Serif Display', serif; font-size: 22px; color: var(--ink); }
+.sum-card .sc-sub { font-size: 11px; color: var(--muted); margin-top: 2px; }
+
+/* Error state */
+.error-state {
+  display: none;
+  background: #fef2f2;
+  border: 1.5px solid #fecaca;
+  border-radius: 10px;
+  padding: 24px;
+  text-align: center;
+  margin-top: 40px;
+}
+
+.error-state h3 { color: var(--danger); font-family: 'DM Serif Display', serif; font-size: 20px; margin-bottom: 8px; }
+.error-state p { font-size: 13px; color: #7f1d1d; line-height: 1.6; }
+
+/* Scrollbar */
+::-webkit-scrollbar { width: 5px; height: 5px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+
+/* PDF export area (hidden) */
+#pdfContent { display: none; }
+</style>
+</head>
+<body>
+
+<div class="app">
+
+  <!-- ===== SIDEBAR ===== -->
+  <aside class="sidebar">
+    <div class="brand">
+      <div class="brand-icon">🛡️</div>
+      <div>
+        <h1>SecurePolicy</h1>
+        <p>Generador de políticas con IA</p>
+      </div>
+    </div>
+
+    <!-- API Key -->
+    <div class="api-section">
+      <label>🔑 Anthropic API Key</label>
+      <input class="api-input" type="password" id="apiKey" placeholder="sk-ant-api03-...">
+      <div class="api-note">Tu clave nunca sale del navegador. Necesaria para generar las políticas.</div>
+    </div>
+
+    <!-- Empresa -->
+    <div class="form-section">
+      <span class="section-label">Información de la empresa</span>
+
+      <div class="field">
+        <label>Nombre de la empresa (opcional)</label>
+        <input type="text" id="companyName" placeholder="Ej: TechCorp S.L.">
+      </div>
+
+      <div class="field">
+        <label>Tamaño de la empresa</label>
+        <select id="companySize">
+          <option value="">— Selecciona —</option>
+          <option value="microempresa (1-9 empleados)">Microempresa (1–9 empleados)</option>
+          <option value="pequeña empresa (10-49 empleados)">Pequeña empresa (10–49 empleados)</option>
+          <option value="mediana empresa (50-249 empleados)">Mediana empresa (50–249 empleados)</option>
+          <option value="gran empresa (250+ empleados)">Gran empresa (250+ empleados)</option>
+        </select>
+      </div>
+
+      <div class="field">
+        <label>Sector de actividad</label>
+        <select id="sector">
+          <option value="">— Selecciona —</option>
+          <option>Banca y Servicios Financieros</option>
+          <option>Sanidad y Salud</option>
+          <option>Retail y E-commerce</option>
+          <option>Tecnología y Software</option>
+          <option>Educación</option>
+          <option>Administración Pública</option>
+          <option>Manufactura e Industria</option>
+          <option>Logística y Transporte</option>
+          <option>Legal y Consultoría</option>
+          <option>Hostelería y Turismo</option>
+          <option>Energía y Utilities</option>
+          <option>Medios y Comunicación</option>
+          <option>Telecomunicaciones</option>
+          <option>Seguros</option>
+          <option>Construcción e Inmobiliario</option>
+        </select>
+      </div>
+
+      <div class="field">
+        <label>Tipo de datos manejados</label>
+        <select id="dataType">
+          <option value="">— Selecciona —</option>
+          <option value="datos personales de clientes (RGPD)">Datos personales de clientes (RGPD)</option>
+          <option value="datos financieros y de pago (PCI-DSS)">Datos financieros y de pago (PCI-DSS)</option>
+          <option value="datos de salud e historiales médicos (LOPD)">Datos de salud (LOPD/HIPAA)</option>
+          <option value="propiedad intelectual y secretos comerciales">Propiedad intelectual</option>
+          <option value="datos de menores de edad">Datos de menores de edad</option>
+          <option value="datos de empleados y RRHH">Datos de empleados y RRHH</option>
+          <option value="información clasificada gubernamental">Información gubernamental</option>
+          <option value="datos de infraestructuras críticas">Infraestructuras críticas</option>
+          <option value="datos mixtos (clientes, empleados, financieros)">Datos mixtos</option>
+        </select>
+      </div>
+
+      <div class="field">
+        <label>Nivel de madurez en seguridad</label>
+        <select id="maturity">
+          <option value="básico (sin políticas previas)">Básico — sin políticas previas</option>
+          <option value="intermedio (algunas políticas)">Intermedio — algunas políticas</option>
+          <option value="avanzado (ISO 27001 / ENS)">Avanzado — ISO 27001 / ENS</option>
+        </select>
+      </div>
+
+      <div class="field">
+        <label>Marco regulatorio principal</label>
+        <select id="framework">
+          <option value="RGPD y ENS (España)">RGPD + ENS (España)</option>
+          <option value="ISO/IEC 27001">ISO/IEC 27001</option>
+          <option value="NIST Cybersecurity Framework">NIST Cybersecurity Framework</option>
+          <option value="PCI-DSS">PCI-DSS</option>
+          <option value="SOC 2">SOC 2</option>
+          <option value="HIPAA">HIPAA</option>
+        </select>
+      </div>
+    </div>
+
+    <!-- Políticas a generar -->
+    <div class="form-section">
+      <span class="section-label">Políticas a generar</span>
+      <div class="check-grid">
+        <label class="check-item checked" onclick="toggleCheck(this)">
+          <input type="checkbox" checked value="contraseñas">
+          <span class="check-box">✓</span>🔐 Contraseñas
+        </label>
+        <label class="check-item checked" onclick="toggleCheck(this)">
+          <input type="checkbox" checked value="acceso">
+          <span class="check-box">✓</span>🚪 Acceso
+        </label>
+        <label class="check-item checked" onclick="toggleCheck(this)">
+          <input type="checkbox" checked value="backups">
+          <span class="check-box">✓</span>💾 Backups
+        </label>
+        <label class="check-item checked" onclick="toggleCheck(this)">
+          <input type="checkbox" checked value="dispositivos">
+          <span class="check-box">✓</span>💻 Dispositivos
+        </label>
+        <label class="check-item checked" onclick="toggleCheck(this)">
+          <input type="checkbox" checked value="incidentes">
+          <span class="check-box">✓</span>🚨 Incidentes
+        </label>
+        <label class="check-item checked" onclick="toggleCheck(this)">
+          <input type="checkbox" checked value="correo electrónico">
+          <span class="check-box">✓</span>📧 Email
+        </label>
+        <label class="check-item checked" onclick="toggleCheck(this)">
+          <input type="checkbox" checked value="teletrabajo y trabajo remoto">
+          <span class="check-box">✓</span>🏠 Teletrabajo
+        </label>
+        <label class="check-item" onclick="toggleCheck(this)">
+          <input type="checkbox" value="uso de IA y herramientas externas">
+          <span class="check-box"></span>🤖 Uso de IA
+        </label>
+        <label class="check-item" onclick="toggleCheck(this)">
+          <input type="checkbox" value="proveedores y terceros">
+          <span class="check-box"></span>🤝 Proveedores
+        </label>
+        <label class="check-item" onclick="toggleCheck(this)">
+          <input type="checkbox" value="redes sociales y comunicación externa">
+          <span class="check-box"></span>📱 RRSS
+        </label>
+      </div>
+    </div>
+
+    <button class="btn-generate" id="generateBtn" onclick="generatePolicies()">
+      ✦ Generar políticas
+    </button>
+
+    <div class="sidebar-footer">
+      Las políticas generadas son orientativas. Se recomienda revisión por un especialista en ciberseguridad antes de su implantación.
+    </div>
+  </aside>
+
+  <!-- ===== MAIN ===== -->
+  <main class="main">
+
+    <!-- Welcome -->
+    <div class="welcome" id="welcomeState">
+      <div class="welcome-icon">🛡️</div>
+      <h2>Políticas de seguridad<br><em style="font-style:italic;color:var(--muted)">a medida para tu empresa</em></h2>
+      <p>Configura los parámetros de tu empresa en el panel lateral y genera políticas de seguridad completas, adaptadas a tu sector y marco regulatorio.</p>
+      <div class="feature-grid">
+        <div class="feature-card">
+          <div class="fc-icon">⚡</div>
+          <div class="fc-title">Generación en segundos</div>
+          <div class="fc-desc">Políticas completas generadas por IA en menos de 30 segundos.</div>
+        </div>
+        <div class="feature-card">
+          <div class="fc-icon">📋</div>
+          <div class="fc-title">Hasta 10 políticas</div>
+          <div class="fc-desc">Contraseñas, acceso, backups, dispositivos, incidentes y más.</div>
+        </div>
+        <div class="feature-card">
+          <div class="fc-icon">🏛️</div>
+          <div class="fc-title">Marco regulatorio</div>
+          <div class="fc-desc">Adaptadas a RGPD, ISO 27001, ENS, PCI-DSS, NIST y más.</div>
+        </div>
+        <div class="feature-card">
+          <div class="fc-icon">📄</div>
+          <div class="fc-title">Exportar a PDF</div>
+          <div class="fc-desc">Descarga el documento completo listo para firmar e implementar.</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Loading -->
+    <div class="loading-state" id="loadingState">
+      <div class="spinner"></div>
+      <div class="loading-text">
+        <h3>Generando tus políticas…</h3>
+        <p>La IA está analizando tu perfil empresarial</p>
+        <div class="loading-steps" id="loadingSteps"></div>
+      </div>
+    </div>
+
+    <!-- Error -->
+    <div class="error-state" id="errorState">
+      <h3>⚠️ Error al generar</h3>
+      <p id="errorMsg">Revisa tu API key e inténtalo de nuevo.</p>
+    </div>
+
+    <!-- Results -->
+    <div class="results" id="resultsState">
+
+      <div class="results-header">
+        <div class="results-meta">
+          <h2 id="resultsTitle">Políticas de Seguridad</h2>
+          <p id="resultsSubtitle"></p>
+        </div>
+        <div class="results-actions">
+          <button class="btn-action btn-copy" onclick="copyAll()">📋 Copiar todo</button>
+          <button class="btn-action btn-pdf" onclick="exportPDF()">📄 Exportar PDF</button>
+        </div>
+      </div>
+
+      <div class="company-badge" id="companyBadge">
+        <span class="dot"></span>
+        <span id="badgeText"></span>
+      </div>
+
+      <div class="summary-grid" id="summaryGrid"></div>
+
+      <div class="tabs-nav" id="tabsNav"></div>
+      <div id="tabsContent"></div>
+
+    </div>
+
+  </main>
+</div>
+
+<script>
+// ---- Helpers ----
+function toggleCheck(el) {
+  el.classList.toggle('checked');
+  const cb = el.querySelector('input');
+  cb.checked = !cb.checked;
+  const box = el.querySelector('.check-box');
+  box.textContent = cb.checked ? '✓' : '';
+}
+
+function getCheckedPolicies() {
+  return Array.from(document.querySelectorAll('.check-item.checked input')).map(i => i.value);
+}
+
+function showState(id) {
+  ['welcomeState','loadingState','errorState','resultsState'].forEach(s => {
+    const el = document.getElementById(s);
+    el.style.display = 'none';
+    if(el.classList.contains('loading-state')) el.style.display = 'none';
+  });
+  const target = document.getElementById(id);
+  target.style.display = id === 'loadingState' ? 'flex' : (id === 'resultsState' ? 'block' : id === 'errorState' ? 'block' : 'flex');
+}
+
+const POLICY_META = {
+  'contraseñas':               { icon: '🔐', label: 'Política de Contraseñas',         severity: 'Alta',   compliance: ['NIST SP 800-63B', 'RGPD Art.32', 'ISO 27001 A.9.4'] },
+  'acceso':                    { icon: '🚪', label: 'Control de Acceso',                severity: 'Alta',   compliance: ['ISO 27001 A.9', 'NIST AC', 'ENS MP.ACC'] },
+  'backups':                   { icon: '💾', label: 'Política de Backups',              severity: 'Alta',   compliance: ['ISO 27001 A.12.3', 'RGPD Art.32', 'ENS MP.INFO'] },
+  'dispositivos':               { icon: '💻', label: 'Gestión de Dispositivos',          severity: 'Alta',   compliance: ['ISO 27001 A.8', 'NIST PR.IP', 'ENS MP.EQ'] },
+  'incidentes':                { icon: '🚨', label: 'Gestión de Incidentes',            severity: 'Alta',   compliance: ['ISO 27001 A.16', 'RGPD Art.33', 'NIST RS'] },
+  'correo electrónico':        { icon: '📧', label: 'Política de Email',                severity: 'Media',  compliance: ['ISO 27001 A.13', 'ENS COM', 'NIST PR.AT'] },
+  'teletrabajo y trabajo remoto':{ icon: '🏠', label: 'Política de Teletrabajo',        severity: 'Alta',   compliance: ['ISO 27001 A.6.2', 'RGPD Art.32', 'ENS MP.COM'] },
+  'uso de IA y herramientas externas':{ icon: '🤖', label: 'Uso de IA y Herramientas', severity: 'Media',  compliance: ['RGPD Art.22', 'EU AI Act', 'ISO 27001 A.15'] },
+  'proveedores y terceros':    { icon: '🤝', label: 'Gestión de Proveedores',           severity: 'Media',  compliance: ['ISO 27001 A.15', 'RGPD Art.28', 'ENS MP.S'] },
+  'redes sociales y comunicación externa':{ icon: '📱', label: 'RRSS y Comunicación', severity: 'Baja',   compliance: ['ISO 27001 A.7', 'RGPD Art.5', 'ENS MP.PER'] },
+};
+
+// ---- Main generation function ----
+async function generatePolicies() {
+  const apiKey     = document.getElementById('apiKey').value.trim();
+  const size       = document.getElementById('companySize').value;
+  const sector     = document.getElementById('sector').value;
+  const dataType   = document.getElementById('dataType').value;
+  const maturity   = document.getElementById('maturity').value;
+  const framework  = document.getElementById('framework').value;
+  const company    = document.getElementById('companyName').value.trim();
+  const policies   = getCheckedPolicies();
+
+  if (!apiKey)  { alert('Por favor introduce tu API key de Anthropic.'); return; }
+  if (!size)    { alert('Selecciona el tamaño de empresa.'); return; }
+  if (!sector)  { alert('Selecciona el sector de actividad.'); return; }
+  if (!dataType){ alert('Selecciona el tipo de datos manejados.'); return; }
+  if (!policies.length) { alert('Selecciona al menos una política a generar.'); return; }
+
+  document.getElementById('generateBtn').disabled = true;
+  showState('loadingState');
+
+  // Animate loading steps
+  const stepsEl = document.getElementById('loadingSteps');
+  stepsEl.innerHTML = policies.map(p => {
+    const meta = POLICY_META[p] || { icon: '📄', label: p };
+    return `<div class="l-step" id="step-${p.replace(/\s/g,'_')}"><span class="dot"></span>${meta.icon} Generando política de ${p}…</div>`;
+  }).join('');
+
+  // Animate steps with delay
+  policies.forEach((p, i) => {
+    setTimeout(() => {
+      const el = document.getElementById('step-' + p.replace(/\s/g,'_'));
+      if (el) { el.classList.add('active'); }
+      if (i > 0) {
+        const prev = document.getElementById('step-' + policies[i-1].replace(/\s/g,'_'));
+        if (prev) { prev.classList.remove('active'); prev.classList.add('done'); }
+      }
+    }, i * 600);
+  });
+
+  const companyCtx = company ? `Empresa: ${company}. ` : '';
+
+  const prompt = `Eres un experto en ciberseguridad empresarial y cumplimiento normativo. 
+${companyCtx}Genera políticas de seguridad detalladas y profesionales para una ${size} del sector de ${sector} que maneja ${dataType}. 
+El nivel de madurez actual en seguridad es ${maturity}. El marco regulatorio principal es ${framework}.
+
+Genera las siguientes políticas: ${policies.join(', ')}.
+
+Para CADA política, proporciona el contenido en formato HTML limpio (sin etiquetas html/body/head, solo el contenido interior). 
+Usa estas etiquetas HTML: <h4> para subsecciones, <ul><li> para listas, <strong> para términos clave, 
+<div class="highlight-box"> para información importante, <div class="warn-box"> para advertencias,
+y <table><thead><tr><th></th></tr></thead><tbody><tr><td></td></tr></tbody></table> para tablas cuando sea apropiado.
+
+Cada política debe incluir:
+1. Objetivo y alcance
+2. Definiciones clave 
+3. Requisitos y normas específicas (detalladas, con valores concretos según el tamaño y sector)
+4. Responsabilidades y roles
+5. Procedimientos de cumplimiento
+6. Consecuencias del incumplimiento
+7. Revisión y vigencia
+
+Responde SOLO con JSON válido en este formato exacto, sin texto adicional:
+{
+  "policies": {
+    "NOMBRE_POLITICA": "CONTENIDO_HTML_COMPLETO",
+    ...
+  }
+}
+
+Las claves del objeto policies deben ser exactamente: ${policies.map(p => `"${p}"`).join(', ')}.
+Haz las políticas completas, profesionales y adaptadas específicamente al contexto dado. Mínimo 600 palabras por política.`;
+
+  try {
+    const resp = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': apiKey,
+        'anthropic-version': '2023-06-01',
+        'anthropic-dangerous-direct-browser-access': 'true'
+      },
+      body: JSON.stringify({
+        model: 'claude-sonnet-4-20250514',
+        max_tokens: 8000,
+        messages: [{ role: 'user', content: prompt }]
+      })
+    });
+
+    if (!resp.ok) {
+      const err = await resp.json();
+      throw new Error(err.error?.message || `HTTP ${resp.status}`);
+    }
+
+    const data = await resp.json();
+    const raw = data.content.map(b => b.text || '').join('');
+
+    // Parse JSON — strip any markdown fences
+    const clean = raw.replace(/```json|```/g, '').trim();
+    const parsed = JSON.parse(clean);
+
+    renderResults(parsed.policies, { company, size, sector, dataType, framework, maturity, policies });
+
+  } catch(e) {
+    document.getElementById('errorMsg').textContent = e.message || 'Error desconocido. Revisa tu API key y los parámetros.';
+    showState('errorState');
+    document.getElementById('errorState').style.display = 'block';
+    // Also hide loading
+    document.getElementById('loadingState').style.display = 'none';
+  }
+
+  document.getElementById('generateBtn').disabled = false;
+}
+
+// ---- Render results ----
+function renderResults(policies, meta) {
+  const companyLabel = meta.company || 'Tu empresa';
+  const now = new Date().toLocaleDateString('es-ES', { day:'2-digit', month:'long', year:'numeric' });
+
+  document.getElementById('resultsTitle').textContent = `Políticas de Seguridad — ${companyLabel}`;
+  document.getElementById('resultsSubtitle').textContent = `Generadas el ${now} · ${Object.keys(policies).length} políticas · ${meta.framework}`;
+
+  document.getElementById('badgeText').textContent = `${meta.size} · ${meta.sector} · ${meta.dataType}`;
+
+  // Summary grid
+  const summaryGrid = document.getElementById('summaryGrid');
+  summaryGrid.innerHTML = `
+    <div class="sum-card">
+      <div class="sc-label">Políticas</div>
+      <div class="sc-val">${Object.keys(policies).length}</div>
+      <div class="sc-sub">documentos generados</div>
+    </div>
+    <div class="sum-card">
+      <div class="sc-label">Marco</div>
+      <div class="sc-val" style="font-size:14px;margin-top:4px">${meta.framework.split(' ')[0]}</div>
+      <div class="sc-sub">${meta.framework}</div>
+    </div>
+    <div class="sum-card">
+      <div class="sc-label">Madurez</div>
+      <div class="sc-val" style="font-size:14px;margin-top:4px">${meta.maturity.split(' ')[0]}</div>
+      <div class="sc-sub">${meta.maturity}</div>
+    </div>
+    <div class="sum-card">
+      <div class="sc-label">Revisión</div>
+      <div class="sc-val" style="font-size:14px;margin-top:4px">Anual</div>
+      <div class="sc-sub">próxima revisión recomendada</div>
+    </div>
+  `;
+
+  // Tabs
+  const tabsNav = document.getElementById('tabsNav');
+  const tabsContent = document.getElementById('tabsContent');
+  tabsNav.innerHTML = '';
+  tabsContent.innerHTML = '';
+
+  Object.entries(policies).forEach(([key, html], idx) => {
+    const meta2 = POLICY_META[key] || { icon: '📄', label: key, severity: 'Media', compliance: [] };
+    const tabId = 'tab_' + key.replace(/[\s\/]/g,'_');
+
+    // Tab button
+    const btn = document.createElement('button');
+    btn.className = 'tab-btn' + (idx === 0 ? ' active' : '');
+    btn.innerHTML = `${meta2.icon} ${meta2.label}`;
+    btn.onclick = () => switchTab(tabId, btn);
+    tabsNav.appendChild(btn);
+
+    // Tab panel
+    const sevClass = meta2.severity === 'Alta' ? 'sev-alta' : meta2.severity === 'Media' ? 'sev-media' : 'sev-baja';
+
+    const panel = document.createElement('div');
+    panel.className = 'policy-panel' + (idx === 0 ? ' active' : '');
+    panel.id = tabId;
+    panel.innerHTML = `
+      <div class="policy-card">
+        <div class="policy-card-head">
+          <h3>${meta2.icon} ${meta2.label}</h3>
+          <span class="severity-badge ${sevClass}">Prioridad ${meta2.severity}</span>
+        </div>
+        <div class="policy-body">${html}</div>
+        ${meta2.compliance.length ? `
+        <div class="compliance-strip">
+          <span>Normativa:</span>
+          ${meta2.compliance.map(c => `<span class="comp-tag">${c}</span>`).join('')}
+        </div>` : ''}
+      </div>
+    `;
+    tabsContent.appendChild(panel);
+  });
+
+  // Store for export
+  window._currentPolicies = policies;
+  window._currentMeta = meta;
+
+  showState('resultsState');
+  document.getElementById('resultsState').style.display = 'block';
+  document.getElementById('loadingState').style.display = 'none';
+}
+
+function switchTab(tabId, btn) {
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+  document.querySelectorAll('.policy-panel').forEach(p => p.classList.remove('active'));
+  btn.classList.add('active');
+  document.getElementById(tabId).classList.add('active');
+}
+
+// ---- Copy all ----
+function copyAll() {
+  if (!window._currentPolicies) return;
+  let text = '';
+  Object.entries(window._currentPolicies).forEach(([key, html]) => {
+    const meta2 = POLICY_META[key] || { label: key };
+    const div = document.createElement('div');
+    div.innerHTML = html;
+    text += `\n${'='.repeat(60)}\n${meta2.label.toUpperCase()}\n${'='.repeat(60)}\n${div.textContent}\n`;
+  });
+  navigator.clipboard.writeText(text).then(() => {
+    const btn = document.querySelector('.btn-copy');
+    btn.textContent = '✓ Copiado';
+    setTimeout(() => btn.textContent = '📋 Copiar todo', 2000);
+  });
+}
+
+// ---- PDF Export ----
+async function exportPDF() {
+  if (!window._currentPolicies || !window._currentMeta) return;
+
+  const btn = document.querySelector('.btn-pdf');
+  const original = btn.textContent;
+  btn.textContent = '⏳ Generando PDF…';
+  btn.disabled = true;
+
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+  const meta = window._currentMeta;
+  const company = meta.company || 'Empresa';
+  const now = new Date().toLocaleDateString('es-ES', { day:'2-digit', month:'long', year:'numeric' });
+  const pageW = 210, pageH = 297, margin = 20, contentW = pageW - margin * 2;
+
+  // ---- Helper: add text with word wrap ----
+  function addWrapped(doc, text, x, y, maxWidth, lineHeight) {
+    const lines = doc.splitTextToSize(text, maxWidth);
+    lines.forEach(line => {
+      if (y > pageH - 20) { doc.addPage(); y = margin; }
+      doc.text(line, x, y);
+      y += lineHeight;
+    });
+    return y;
+  }
+
+  // ---- Cover page ----
+  doc.setFillColor(17, 17, 24);
+  doc.rect(0, 0, pageW, pageH, 'F');
+
+  doc.setFillColor(26, 86, 219);
+  doc.rect(0, 0, 8, pageH, 'F');
+
+  doc.setTextColor(240, 236, 228);
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(36);
+  doc.text('POLÍTICAS DE', margin + 4, 80);
+  doc.text('SEGURIDAD', margin + 4, 95);
+
+  doc.setFontSize(14);
+  doc.setTextColor(100, 140, 230);
+  doc.text(company.toUpperCase(), margin + 4, 115);
+
+  doc.setFontSize(10);
+  doc.setTextColor(130, 125, 128);
+  doc.text(`Generado: ${now}`, margin + 4, 130);
+  doc.text(`Sector: ${meta.sector}`, margin + 4, 138);
+  doc.text(`Marco: ${meta.framework}`, margin + 4, 146);
+  doc.text(`Tamaño: ${meta.size}`, margin + 4, 154);
+
+  doc.setFontSize(8);
+  doc.setTextColor(70, 70, 90);
+  doc.text('Documento generado automáticamente. Revisar con especialista antes de implementar.', margin + 4, pageH - 20);
+
+  // ---- Policy pages ----
+  Object.entries(window._currentPolicies).forEach(([key, html]) => {
+    doc.addPage();
+    const meta2 = POLICY_META[key] || { icon: '', label: key, severity: 'Media' };
+
+    // Header bar
+    doc.setFillColor(26, 86, 219);
+    doc.rect(0, 0, pageW, 14, 'F');
+    doc.setTextColor(255, 255, 255);
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(9);
+    doc.text(`SECUREPOLICY · ${company.toUpperCase()}`, margin, 9);
+    doc.text(now, pageW - margin, 9, { align: 'right' });
+
+    // Title
+    doc.setTextColor(17, 17, 24);
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(20);
+    doc.text(meta2.label, margin, 32);
+
+    // Severity badge
+    const sevColor = meta2.severity === 'Alta' ? [220, 38, 38] : meta2.severity === 'Media' ? [217, 119, 6] : [13, 159, 110];
+    doc.setFillColor(...sevColor);
+    doc.roundedRect(margin, 36, 38, 6, 1.5, 1.5, 'F');
+    doc.setTextColor(255, 255, 255);
+    doc.setFontSize(7);
+    doc.setFont('helvetica', 'bold');
+    doc.text(`PRIORIDAD ${meta2.severity.toUpperCase()}`, margin + 3, 40.5);
+
+    // Compliance tags
+    if (meta2.compliance?.length) {
+      let cx = margin + 44;
+      meta2.compliance.forEach(c => {
+        const cw = doc.getTextWidth(c) + 8;
+        doc.setFillColor(238, 243, 253);
+        doc.roundedRect(cx, 36, cw, 6, 1.5, 1.5, 'F');
+        doc.setTextColor(26, 86, 219);
+        doc.setFontSize(7);
+        doc.text(c, cx + 4, 40.5);
+        cx += cw + 4;
+      });
+    }
+
+    // Divider
+    doc.setDrawColor(226, 221, 214);
+    doc.setLineWidth(0.3);
+    doc.line(margin, 46, pageW - margin, 46);
+
+    // Content — extract text from HTML
+    const tmp = document.createElement('div');
+    tmp.innerHTML = html;
+
+    let y = 55;
+    doc.setTextColor(42, 42, 53);
+
+    // Process nodes
+    function processNode(node) {
+      if (y > pageH - 20) { doc.addPage(); y = margin + 5; }
+
+      if (node.nodeType === Node.TEXT_NODE) {
+        const text = node.textContent.trim();
+        if (text) {
+          doc.setFont('helvetica', 'normal');
+          doc.setFontSize(9);
+          y = addWrapped(doc, text, margin, y, contentW, 5);
+          y += 1;
+        }
+        return;
+      }
+
+      if (node.nodeType !== Node.ELEMENT_NODE) return;
+
+      const tag = node.tagName.toLowerCase();
+
+      if (tag === 'h4') {
+        if (y > pageH - 30) { doc.addPage(); y = margin + 5; }
+        y += 4;
+        doc.setFont('helvetica', 'bold');
+        doc.setFontSize(11);
+        doc.setTextColor(17, 17, 24);
+        y = addWrapped(doc, node.textContent.trim(), margin, y, contentW, 6);
+        doc.setDrawColor(226, 221, 214);
+        doc.setLineWidth(0.2);
+        doc.line(margin, y, pageW - margin, y);
+        y += 4;
+        doc.setTextColor(42, 42, 53);
+        return;
+      }
+
+      if (tag === 'ul') {
+        Array.from(node.children).forEach(li => {
+          if (y > pageH - 20) { doc.addPage(); y = margin + 5; }
+          doc.setFont('helvetica', 'normal');
+          doc.setFontSize(9);
+          doc.setTextColor(42, 42, 53);
+          const txt = '• ' + li.textContent.trim();
+          y = addWrapped(doc, txt, margin + 4, y, contentW - 4, 5);
+          y += 1;
+        });
+        y += 2;
+        return;
+      }
+
+      if (tag === 'table') {
+        if (y > pageH - 40) { doc.addPage(); y = margin + 5; }
+        const rows = Array.from(node.querySelectorAll('tr'));
+        const colW = contentW / 3;
+        rows.forEach((row, ri) => {
+          const cells = Array.from(row.querySelectorAll('th, td'));
+          if (ri === 0) {
+            doc.setFillColor(240, 237, 230);
+            doc.rect(margin, y - 4, contentW, 7, 'F');
+            doc.setFont('helvetica', 'bold');
+            doc.setFontSize(8);
+          } else {
+            if (ri % 2 === 0) {
+              doc.setFillColor(247, 245, 240);
+              doc.rect(margin, y - 4, contentW, 7, 'F');
+            }
+            doc.setFont('helvetica', 'normal');
+            doc.setFontSize(8.5);
+          }
+          cells.forEach((cell, ci) => {
+            doc.text(cell.textContent.trim().substring(0, 40), margin + ci * colW + 2, y);
+          });
+          y += 7;
+          if (y > pageH - 20) { doc.addPage(); y = margin + 5; }
+        });
+        y += 4;
+        return;
+      }
+
+      if (tag === 'div' && (node.className.includes('highlight-box') || node.className.includes('warn-box'))) {
+        if (y > pageH - 30) { doc.addPage(); y = margin + 5; }
+        const isWarn = node.className.includes('warn-box');
+        doc.setFillColor(isWarn ? 255 : 238, isWarn ? 251 : 243, isWarn ? 235 : 253);
+        doc.setDrawColor(isWarn ? 217 : 26, isWarn ? 119 : 86, isWarn ? 6 : 219);
+        doc.setLineWidth(0.4);
+        const txt = node.textContent.trim();
+        const lines = doc.splitTextToSize(txt, contentW - 10);
+        const boxH = lines.length * 5 + 6;
+        doc.rect(margin, y - 3, contentW, boxH, 'FD');
+        doc.line(margin, y - 3, margin, y - 3 + boxH);
+        doc.setTextColor(42, 42, 53);
+        doc.setFont('helvetica', 'normal');
+        doc.setFontSize(8.5);
+        lines.forEach(line => { doc.text(line, margin + 5, y); y += 5; });
+        y += 6;
+        return;
+      }
+
+      if (tag === 'strong') {
+        doc.setFont('helvetica', 'bold');
+        doc.setFontSize(9);
+        const txt = node.textContent.trim();
+        if (txt) { y = addWrapped(doc, txt, margin, y, contentW, 5); }
+        doc.setFont('helvetica', 'normal');
+        return;
+      }
+
+      if (tag === 'p' || tag === 'div') {
+        Array.from(node.childNodes).forEach(processNode);
+        y += 2;
+        return;
+      }
+
+      // Fallback: process children
+      Array.from(node.childNodes).forEach(processNode);
+    }
+
+    Array.from(tmp.childNodes).forEach(processNode);
+
+    // Page footer
+    const pageCount = doc.getNumberOfPages();
+    for (let i = 1; i <= pageCount; i++) {
+      doc.setPage(i);
+      if (i === 1) continue; // skip cover footer handling — already done above
+      doc.setFontSize(7);
+      doc.setTextColor(150, 145, 140);
+      doc.text(`${company} · Políticas de Seguridad · ${now}`, margin, pageH - 8);
+      doc.text(`Pág. ${i - 1}`, pageW - margin, pageH - 8, { align: 'right' });
+    }
+  });
+
+  // Save
+  const filename = `politicas-seguridad-${(meta.company || 'empresa').replace(/\s/g,'-').toLowerCase()}-${Date.now()}.pdf`;
+  doc.save(filename);
+
+  btn.textContent = '✓ PDF descargado';
+  setTimeout(() => { btn.textContent = original; btn.disabled = false; }, 2500);
+}
+</script>
+
+</body>
+</html>
